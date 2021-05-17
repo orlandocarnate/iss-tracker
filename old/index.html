@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ISS Tracker</title>
+  </head>
+  <body>
+    <div id="content"></div>
+
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="js/Three.js"></script>
+    <script src="js/controls/OrbitControls.js"></script>
+    <script>
+        
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      const geometry = new THREE.BoxGeometry();
+      const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+      const cube = new THREE.Mesh(geometry, material);
+      scene.add(cube);
+
+      const earthTexture = new THREE.TextureLoader().load('globe.jpg');
+      earthTexture.wrapS = THREE.RepeatWrapping;
+      earthTexture.wrapT = THREE.RepeatWrapping;
+      earthTexture.offset.set(0.5,0);
+      const sphere = new THREE.SphereGeometry(90, 32, 32);
+      const sphereMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        map: earthTexture,
+        // wireframe: true,
+      });
+      const earth = new THREE.Mesh(sphere, sphereMaterial);
+      scene.add(earth);
+
+      let prevPoint = new THREE.Vector3();
+      let newPoint = new THREE.Vector3();
+
+      const cartesionCoords = () =>
+        axios.get("http://api.open-notify.org/iss-now.json").then((res) => {
+          const coords = res.data;
+          console.log(
+            parseFloat(coords.iss_position.latitude),
+            parseFloat(coords.iss_position.longitude)
+          );
+
+          const points = [];
+          points.push(prevPoint);
+          const earthRadius = 100; // in km
+          const latitude =
+            (parseFloat(coords.iss_position.latitude) * Math.PI) / 180;
+          const longitude =
+            (parseFloat(coords.iss_position.longitude) * Math.PI) / 180;
+          x = - earthRadius * Math.cos(latitude) * Math.cos(longitude);
+          z = earthRadius * Math.cos(latitude) * Math.sin(longitude);
+          y = earthRadius * Math.sin(latitude);
+
+          const timestamp = new Date(
+            coords.timestamp * 1000
+          ).toLocaleString("en-US", { timeZone: "America/Chicago" });
+
+          console.log(`Cartesion Coordinates: ${x}, ${y}, ${z}`);
+          console.log(`Time: ${timestamp}`);
+
+          cube.position.set(x, y, z);
+          newPoint.set(x, y, z);
+          points.push(newPoint);
+          console.log("Prev: ", prevPoint, "New: ", newPoint);
+          console.log("Points: ", points);
+
+          const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+          const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
+          const line = new THREE.Line(lineGeometry, lineMaterial);
+          scene.add(line);
+          prevPoint.set(x, y, z);
+        });
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+      camera.position.z = 250;
+
+      const clock = new THREE.Clock();
+
+      let time = Date.now();
+
+      const animate = () => {
+        requestAnimationFrame(animate);
+
+        // time
+
+        controls.update();
+
+        renderer.render(scene, camera);
+      };
+
+      setInterval(() => {
+        cartesionCoords();
+      }, 10000);
+
+      animate();
+    </script>
+  </body>
+</html>
