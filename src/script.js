@@ -48,7 +48,7 @@ gui.add(directionalLight.position, 'z').min(- 300).max(300).step(1).name('lightZ
 const gltfLoader = new GLTFLoader();
 let iss;
 gltfLoader.load(
-  "/models/iss-station.gltf",
+  "./models/iss-station.gltf",
   (gltf) => {
       iss = gltf.scene;
     console.log("success");
