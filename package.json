@@ -1,7 +1,7 @@
 {
   "repository": "#",
   "license": "UNLICENSED",
-  "homepage": "http://orlandocarnate.com/iss-tracker",
+  "homepage": "http://orlandocarnate.com/iss-tracker/",
   "scripts": {
     "build": "webpack --config ./bundler/webpack.prod.js",
     "dev": "webpack serve --config ./bundler/webpack.dev.js",
