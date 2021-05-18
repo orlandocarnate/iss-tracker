@@ -5,19 +5,23 @@ import * as dat from "dat.gui";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 // import axios from "axios";
 import gsap from "gsap";
+import { issLocation, convertToRadians } from "./issdata.js";
 
 // Debug
 const gui = new dat.GUI();
 const debugObject = {};
 let issVec3 = new THREE.Vector3();
 
+const points = [];
+let prevPoint = new THREE.Vector3();
+let newPoint = new THREE.Vector3();
+
+console.log("ISS Tracker External Function", issLocation());
+
 /**
  * SCENE
  */
 const scene = new THREE.Scene();
-const points = [];
-let prevPoint = new THREE.Vector3();
-let newPoint = new THREE.Vector3();
 
 let tl = gsap.timeline();
 
@@ -167,34 +171,34 @@ gltfLoader.load(
 
     iss.scale.set(2, 2, 2);
     // iss.position.set(0, 100, 0);
-    iss.rotation.x = Math.PI * 0.5;
+    // iss.rotation.x = Math.PI * 0.5;
+    // iss.rotation.y = Math.PI * 1;
 
-    fetch("http://api.open-notify.org/iss-now.json")
+    fetch("https://api.wheretheiss.at/v1/satellites/25544")
       .then((response) => response.json())
       .then((data) => {
-        //   console.log("ISS API Data: ", data);
-        const earthRadius = 100; // in km
-        let radLat = (data.iss_position.latitude * Math.PI) / 180;
-        let radLong = (data.iss_position.longitude * Math.PI) / 180;
-        console.log(radLat, radLong);
+        const issRad = convertToRadians(100, data.latitude, data.longitude);
+        const camRad = convertToRadians(160, data.latitude, data.longitude);
+        console.log("visibility: ", data.visibility);
 
-        let x = -earthRadius * Math.cos(radLat) * Math.cos(radLong);
-        let y = earthRadius * Math.sin(radLat);
-        let z = earthRadius * Math.cos(radLat) * Math.sin(radLong);
-        let camX = -(earthRadius + 50) * Math.cos(radLat) * Math.cos(radLong);
-        let camY = (earthRadius + 50) * Math.sin(radLat);
-        let camZ = (earthRadius + 50) * Math.cos(radLat) * Math.sin(radLong);
-
-        // const timestamp = new Date(data.timestamp * 1000).toLocaleString("en-US", {
-        //   timeZone: "America/Chicago",
-        // });
-
-        iss.position.set(x, y, z);
-        tl.to(camera.position, { x: camX, y: camY, z: camZ, duration: 5 });
-        tl.to(iss.position, { x, y, z, duration: 10, ease: "none" });
+        iss.position.set(issRad[0], issRad[1], issRad[2]);
+        tl.to(camera.position, {
+          x: camRad[0],
+          y: camRad[1],
+          z: camRad[2],
+          duration: 3,
+        });
+        tl.to(iss.position, {
+          x: issRad[0],
+          y: issRad[1],
+          z: issRad[2],
+          duration: 10,
+          ease: "none",
+        });
 
         iss.lookAt(0, 0, 0);
-        prevPoint.set(x, y, z);
+        iss.rotation.z = Math.PI * 0.4;
+        prevPoint.set(issRad[0], issRad[1], issRad[2]);
         points.push(prevPoint);
       });
 
@@ -239,52 +243,81 @@ const earth = new THREE.Mesh(sphere, sphereMaterial);
 earth.rotation.y = 1 * Math.PI;
 scene.add(earth);
 
-const getISS = () => {
-  fetch("http://api.open-notify.org/iss-now.json")
+/**
+ * Plot Previous Path Lines
+ */
+const issPastPlot = () => {
+  const timestamp = Date.now() / 1000;
+  const timeList = [];
+  for (let i = 0; i < 3000; i = i + 300) {
+    timeList.push(timestamp - i);
+  }
+
+  // call API
+  let api =
+    "https://api.wheretheiss.at/v1/satellites/25544/positions?timestamps=";
+  api += timeList.join(",");
+
+  fetch(api)
     .then((response) => response.json())
     .then((data) => {
-      //   console.log("ISS API Data: ", data);
-      const earthRadius = 100; // in km
-      let radLat = (data.iss_position.latitude * Math.PI) / 180;
-      let radLong = (data.iss_position.longitude * Math.PI) / 180;
-      console.log(radLat, radLong);
+      console.log("data: ", data);
+      const plotData = [];
 
-      let x = -earthRadius * Math.cos(radLat) * Math.cos(radLong);
-      let y = earthRadius * Math.sin(radLat);
-      let z = earthRadius * Math.cos(radLat) * Math.sin(radLong);
+      for (const element of data) {
+        console.log("element.latitude: ", element.latitude);
+        let point = new THREE.Vector3();
+        const converted = convertToRadians(
+          100,
+          element.latitude,
+          element.longitude
+        );
+        console.log(converted);
+        point.set(converted[0], converted[1], converted[2]);
+        console.log("point: ", point);
+        plotData.push(point);
+      }
 
-      // const timestamp = new Date(data.timestamp * 1000).toLocaleString("en-US", {
-      //   timeZone: "America/Chicago",
-      // });
+      const pastlineGeometry = new THREE.BufferGeometry().setFromPoints(
+        plotData
+      );
+      const pastlineMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
+      const pastline = new THREE.Line(pastlineGeometry, pastlineMaterial);
+      scene.add(pastline);
+    });
+};
 
-      moveISS(x, y, z);
+issPastPlot();
+
+// -------------------------------------------------------------
+
+const getISS = () => {
+  fetch("https://api.wheretheiss.at/v1/satellites/25544")
+    .then((response) => response.json())
+    .then((data) => {
+      const issRad = convertToRadians(100, data.latitude, data.longitude);
+
+      moveISS(issRad[0], issRad[1], issRad[2]);
     });
 };
 
 const moveISS = (x, y, z) => {
-  // console.log(`Cartesion Coordinates: ${x}, ${y}, ${z}`);
-  // console.log(`Time: ${timestamp}`);
-
-  // console.log(iss);
-
   newPoint.set(x, y, z);
-  // tl.to(iss.lookAt, {x:0, y:0, z:0, duration: 10,  ease: "none"});
-
   points.push(newPoint);
-
-  // console.log("Prev: ", prevPoint, "New: ", newPoint);
-  // console.log("Points: ", points);
 
   const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
   const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
   const line = new THREE.Line(lineGeometry, lineMaterial);
   scene.add(line);
 
-  // iss.position.set(x, y, z);
-  tl.to(iss.position, { x, y, z, duration: 9, ease: "none" });
+  iss.position.set(x, y, z);
+  // tl.to(iss.position, { x, y, z, duration: 9, ease: "none" });
   iss.lookAt(0, 0, 0);
+  iss.rotation.z = Math.PI * 0.4;
   prevPoint.set(x, y, z);
 };
+
+// gui.add(iss.position, "x").min(-300).max(300).step(1).name("issX");
 
 const clock = new THREE.Clock();
 
