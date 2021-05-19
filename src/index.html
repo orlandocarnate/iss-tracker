@@ -20,37 +20,99 @@
       font-size: 0.8em;
     }
 
-    #info {
+    .menu {
       position: absolute;
-      top: 25px;
-      left: 25px;
-      z-index: 100;
-      background-color: rgba(255, 255, 255, 0.75);
-      /* color: whitesmoke; */
+      top: 20px;
+      left: 0px;
+      /* width: 200px;
+      height: 45px; */
+      /* padding: 5px 5px 5px 5px; */
+      /* background-color: teal; */
+    }
+
+    /* The sidebar menu */
+    .sidebar {
+      height: 100%; /* 100% Full-height */
+      width: 0; /* 0 width - change this with JavaScript */
+      position: fixed; /* Stay in place */
+      z-index: 100; /* Stay on top */
+      top: 0;
+      left: 0;
+      background-color: rgb(255, 255, 255); /* Black*/
+      overflow-x: hidden; /* Disable horizontal scroll */
+      padding-top: 40px; /* Place content 60px from the top */
+      transition: 0.5s; /* 0.5 second transition effect to slide in the sidebar */
+      display: inline-block;
+    }
+
+    /* The sidebar links */
+    .sidebar a {
+      padding: 8px 8px 8px 32px;
+      /* text-decoration: none; */
+      /* font-size: 25px; */
+      /* display: block; */
+      transition: 0.3s;
+    }
+
+    /* When you mouse over the navigation links, change their color */
+    .sidebar a:hover {
+      color: #1d1d1d;
+    }
+
+    /* Position and style the close button (top right corner) */
+    .sidebar .closebtn {
+      color: #cfcfcf;
+      text-decoration: none;
+      position: absolute;
+      top: 0;
+      right: 0px;
+      font-size: 30px;
+      width: 100%;
+      height: 40px;
+      padding: 0;
+      margin: 0;
+      text-align: right;
+      /* margin-left: 50px; */
+      background-color: rgb(151, 151, 151);
+    }
+
+
+
+    /* The button used to open the sidebar */
+    .openbtn {
+      font-size: 20px;
+      cursor: pointer;
+      background-color: rgb(0, 119, 255);
+      color: white;
+      padding: 10px 15px;
+      border: none;
+    }
+
+    .openbtn:hover {
+      background-color: #444;
     }
 
     #stats {
       position: absolute;
       color: whitesmoke;
       top: 25px;
-      right: 25px;
-      z-index: 100;
+      right: 0px;
+      z-index: 50;
       background-color: rgba(0, 0, 0, 0.25);
       width: 250px;
       /* height: 150px; */
       padding: 5px;
     }
 
-    .card {
-      /* Add shadows to create the "card" effect */
+    /* .card {
       box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
       transition: 0.3s;
       width: 250px;
       padding-bottom: 20px;
-    }
+    } */
 
     .card-img {
-      background-image: url(/images/iss-station.jpg);
+      background-image: url(./images/iss-station.jpg);
       background-size: 255px;
       max-width: 100%;
       height: 120px;
@@ -69,52 +131,26 @@
     }
 
     .twitter {
+
       margin: 10px, 0px;
-      height: 300px;
-      overflow: scroll;
-    }
-
-    .collapsible {
-      background-color: #eee;
-      color: #444;
-      cursor: pointer;
-      padding: 5px;
-      width: 100%;
-      border: none;
-      text-align: center;
-      outline: none;
-      font-size: 15px;
-    }
-
-    .active,
-    .collapsible:hover {
-      background-color: #ccc;
+      /* height: 100%; */
+      overflow: hidden;
     }
 
     .content {
       padding: 0;
       /* background-color: white; */
-      max-height: 300px;
+      /* max-height: 300px; */
       overflow: hidden;
       transition: max-height 0.2s ease-out;
-    }
-    .collapsible:after {
-      content: "\02795"; /* Unicode character for "plus" sign (+) */
-      font-size: 13px;
-      color: white;
-      float: right;
-      margin-left: 5px;
-    }
-
-    .active:after {
-      content: "\2796"; /* Unicode character for "minus" sign (-) */
     }
 
     .footer {
       position: absolute;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      /* display: flex; */
+      /* align-items: center; */
+      /* justify-content: center; */
+      text-align: center;
       width: 100%;
       height: 50px;
       bottom: 10px;
@@ -125,8 +161,9 @@
 
     .footer a {
       text-decoration: none;
-      color:whitesmoke;
+      color: whitesmoke;
     }
+
   </style>
   <head>
     <meta charset="UTF-8" />
@@ -135,6 +172,11 @@
   </head>
   <body>
     <div id="canvas"></div>
+
+    <div class="menu">
+      <button class="openbtn" onclick="openNav()">&#9776;</button>
+    </div>
+
     <div id="stats">
       <table>
         <thead>
@@ -142,10 +184,6 @@
             <th>Current Stats</th>
           </tr>
         </thead>
-        <tr>
-          <td>Latitude:</td>
-          <td id="latitude"></td>
-        </tr>
         <tr>
           <td>Latitude:</td>
           <td id="latitude"></td>
@@ -172,8 +210,12 @@
         </tr>
       </table>
     </div>
-    <div id="info">
-      <button type="button" class="collapsible">About the ISS</button>
+
+    <div id="mysidebar" class="sidebar">
+      <a href="javascript:void(0)" class="closebtn" onclick="closeNav()"
+        >&times;</a
+      >
+      <!-- <button type="button" class="collapsible">About the ISS</button> -->
       <div class="card content">
         <div class="card-img"></div>
         <div class="container">
@@ -206,6 +248,7 @@
               style="border: 0 none transparent"
             ></iframe>
           </div>
+
           <div class="twitter">
             <a
               class="twitter-timeline"
@@ -222,7 +265,10 @@
       </div>
     </div>
 
-    <div class="footer">Orlando Carnate &nbsp;&nbsp;|&nbsp;&nbsp; 3D Artist and Web Developer &nbsp;&nbsp;|&nbsp;&nbsp; <a href="mailto:orlando3d@outlook.com">orlando3d@outlook.com</a>
+    <div class="footer">
+      Orlando Carnate &nbsp;&nbsp;|&nbsp;&nbsp; 3D Artist and Web Developer
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <a href="mailto:orlando3d@outlook.com">orlando3d@outlook.com</a>
     </div>
     <!-- <div class="footer">
       Orlando Carnate &nbsp;&nbsp;| &nbsp;&nbsp; <a href="https://orlandocarnate.com">orlandocarnate.com</a> &nbsp;&nbsp;|&nbsp;&nbsp; 
@@ -230,19 +276,16 @@
     </div> -->
 
     <script>
-      var coll = document.getElementsByClassName("collapsible");
-      var i;
+      /* Set the width of the sidebar to 250px and the left margin of the page content to 250px */
+      function openNav() {
+        document.getElementById("mysidebar").style.width = "250px";
+        // document.getElementById("main").style.marginLeft = "250px";
+      }
 
-      for (i = 0; i < coll.length; i++) {
-        coll[i].addEventListener("click", function () {
-          this.classList.toggle("active");
-          var content = this.nextElementSibling;
-          if (content.style.maxHeight) {
-            content.style.maxHeight = null;
-          } else {
-            content.style.maxHeight = content.scrollHeight + "px";
-          }
-        });
+      /* Set the width of the sidebar to 0 and the left margin of the page content to 0 */
+      function closeNav() {
+        document.getElementById("mysidebar").style.width = "0";
+        // document.getElementById("main").style.marginLeft = "0";
       }
     </script>
   </body>
