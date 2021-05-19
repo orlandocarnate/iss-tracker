@@ -9,6 +9,7 @@ import { issLocation, convertToRadians } from "./issdata.js";
 
 // Debug
 const gui = new dat.GUI();
+dat.GUI.toggleHide();
 const debugObject = {};
 let issVec3 = new THREE.Vector3();
 
@@ -52,7 +53,7 @@ window.addEventListener("resize", () => {
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+document.getElementById("canvas").appendChild(renderer.domElement);
 
 /** \
  * Camera
@@ -76,20 +77,20 @@ camera.position.z = 250;
 /**
  * LIGHTS
  */
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
 scene.add(ambientLight);
 
 gui.add(ambientLight, "intensity").min(0).max(3).step(0.001);
 
-const directionalLight = new THREE.DirectionalLight("#ffffff", 1);
-directionalLight.castShadow = true;
-directionalLight.shadow.camera.far = 15;
-directionalLight.shadow.mapSize.set(1024, 1024);
-directionalLight.shadow.normalBias = 0.05;
-directionalLight.position.set(-180, 290, 200);
+const directionalLight = new THREE.DirectionalLight("#fcffbe", 1);
+// directionalLight.castShadow = true;
+// directionalLight.shadow.camera.far = 15;
+// directionalLight.shadow.mapSize.set(1024, 1024);
+// directionalLight.shadow.normalBias = 0.05;
+directionalLight.position.set(90, -80, 145);
 
-const directionalLight2 = new THREE.DirectionalLight("#AAAAff", 0.4);
-directionalLight2.position.set(180, -290, -200);
+const directionalLight2 = new THREE.DirectionalLight("#bee2ff", 1);
+directionalLight2.position.set(0, 120, -180);
 scene.add(directionalLight, directionalLight2);
 
 gui
@@ -107,7 +108,7 @@ gui
 gui
   .add(directionalLight.position, "y")
   .min(-300)
-  .max(300)
+  .max(500)
   .step(1)
   .name("lightY");
 gui
@@ -116,6 +117,31 @@ gui
   .max(300)
   .step(1)
   .name("lightZ");
+
+gui
+  .add(directionalLight2, "intensity")
+  .min(0)
+  .max(10)
+  .step(0.001)
+  .name("2lightIntensity");
+gui
+  .add(directionalLight2.position, "x")
+  .min(-300)
+  .max(300)
+  .step(1)
+  .name("2lightX");
+gui
+  .add(directionalLight2.position, "y")
+  .min(-300)
+  .max(300)
+  .step(1)
+  .name("2lightY");
+gui
+  .add(directionalLight2.position, "z")
+  .min(-300)
+  .max(300)
+  .step(1)
+  .name("2lightZ");
 
 /**
  * Update all materials
@@ -156,64 +182,6 @@ gui
   .step(0.1)
   .onChange(updateAllMaterials);
 
-/**
- * Models
- */
-
-const gltfLoader = new GLTFLoader();
-let iss;
-gltfLoader.load(
-  "./models/iss-station.gltf",
-  (gltf) => {
-    iss = gltf.scene;
-    console.log("success");
-    console.log(iss);
-
-    iss.scale.set(2, 2, 2);
-    // iss.position.set(0, 100, 0);
-    // iss.rotation.x = Math.PI * 0.5;
-    // iss.rotation.y = Math.PI * 1;
-
-    fetch("https://api.wheretheiss.at/v1/satellites/25544")
-      .then((response) => response.json())
-      .then((data) => {
-        const issRad = convertToRadians(100, data.latitude, data.longitude);
-        const camRad = convertToRadians(160, data.latitude, data.longitude);
-        console.log("visibility: ", data.visibility);
-
-        iss.position.set(issRad[0], issRad[1], issRad[2]);
-        tl.to(camera.position, {
-          x: camRad[0],
-          y: camRad[1],
-          z: camRad[2],
-          duration: 3,
-        });
-        tl.to(iss.position, {
-          x: issRad[0],
-          y: issRad[1],
-          z: issRad[2],
-          duration: 10,
-          ease: "none",
-        });
-
-        iss.lookAt(0, 0, 0);
-        iss.rotation.z = Math.PI * 0.4;
-        prevPoint.set(issRad[0], issRad[1], issRad[2]);
-        points.push(prevPoint);
-      });
-
-    scene.add(iss);
-  },
-  (progress) => {
-    console.log("progress");
-    console.log(progress);
-  },
-  (error) => {
-    console.log("error");
-    console.log(error);
-  }
-);
-
 // Earth
 
 const earthTexture = new THREE.TextureLoader().load(
@@ -246,6 +214,7 @@ scene.add(earth);
 /**
  * Plot Previous Path Lines
  */
+const pastPlotData = [];
 const issPastPlot = () => {
   const timestamp = Date.now() / 1000;
   const timeList = [];
@@ -262,28 +231,32 @@ const issPastPlot = () => {
     .then((response) => response.json())
     .then((data) => {
       console.log("data: ", data);
-      const plotData = [];
 
       for (const element of data) {
-        console.log("element.latitude: ", element.latitude);
         let point = new THREE.Vector3();
         const converted = convertToRadians(
           100,
           element.latitude,
           element.longitude
         );
-        console.log(converted);
         point.set(converted[0], converted[1], converted[2]);
-        console.log("point: ", point);
-        plotData.push(point);
+        // console.log("point: ", point);
+        pastPlotData.push(point);
       }
 
       const pastlineGeometry = new THREE.BufferGeometry().setFromPoints(
-        plotData
+        pastPlotData
       );
-      const pastlineMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
+      const pastlineMaterial = new THREE.LineDashedMaterial({
+        color: 0xffff00,
+        linewidth: 1,
+        scale: 10,
+        dashSize: 3,
+        gapSize: 10,
+      });
       const pastline = new THREE.Line(pastlineGeometry, pastlineMaterial);
       scene.add(pastline);
+      pastline.computeLineDistances();
     });
 };
 
@@ -291,11 +264,80 @@ issPastPlot();
 
 // -------------------------------------------------------------
 
+const stats = (params) => {
+  console.log('params: ', params);
+  // Google Maps; z= Zoom level
+  const googleMaps = `<a target="_blank" href="https://www.google.com/maps/place/${params.latitude},${params.longitude}/@${params.latitude},${params.longitude},8z">Link</a>`;
+  document.getElementById("latitude").innerHTML = params.latitude;
+  document.getElementById("longitude").innerHTML = params.longitude;
+  document.getElementById("altitude").innerHTML = params.altitude.toFixed(2);
+  document.getElementById("velocity").innerHTML = params.velocity.toFixed(0);
+  document.getElementById("visibility").innerHTML = params.visibility;
+  document.getElementById("googlemap").innerHTML = googleMaps;
+}
+
+/**
+ * Models
+ */
+
+const gltfLoader = new GLTFLoader();
+let iss;
+gltfLoader.load(
+  "./models/iss-station.gltf",
+  (gltf) => {
+    iss = gltf.scene;
+    console.log("success");
+    console.log(iss);
+
+    iss.scale.set(2, 2, 2);
+    // iss.position.set(0, 100, 0);
+    // iss.rotation.x = Math.PI * 0.5;
+    // iss.rotation.y = Math.PI * 1;
+
+    fetch("https://api.wheretheiss.at/v1/satellites/25544")
+      .then((response) => response.json())
+      .then((data) => {
+        const issRad = convertToRadians(100, data.latitude, data.longitude);
+        const camRad = convertToRadians(160, data.latitude, data.longitude);
+        // console.log("visibility: ", data.visibility);
+        stats(data);
+        // document.getElementById("coords").innerHTML = `${data.latitude}, ${data.longitude}`;
+
+        iss.position.set(issRad[0], issRad[1], issRad[2]);
+        iss.lookAt(0, 0, 0);
+
+        tl.to(camera.position, {
+          x: camRad[0],
+          y: camRad[1],
+          z: camRad[2],
+          duration: 3,
+        });
+
+        prevPoint.set(issRad[0], issRad[1], issRad[2]);
+        points.push(prevPoint);
+      });
+
+    
+    scene.add(iss);
+
+  },
+  (progress) => {
+    console.log("progress");
+    console.log(progress);
+  },
+  (error) => {
+    console.log("error");
+    console.log(error);
+  }
+);
+
 const getISS = () => {
   fetch("https://api.wheretheiss.at/v1/satellites/25544")
     .then((response) => response.json())
     .then((data) => {
       const issRad = convertToRadians(100, data.latitude, data.longitude);
+
+      stats(data)
 
       moveISS(issRad[0], issRad[1], issRad[2]);
     });
@@ -313,11 +355,11 @@ const moveISS = (x, y, z) => {
   iss.position.set(x, y, z);
   // tl.to(iss.position, { x, y, z, duration: 9, ease: "none" });
   iss.lookAt(0, 0, 0);
-  iss.rotation.z = Math.PI * 0.4;
+  // iss.lookAt(prevPoint.x, prevPoint.y, prevPoint.z);
+  // iss.rotation.x = Math.PI * 2;
+  // iss.rotation.y = Math.PI * 2;
   prevPoint.set(x, y, z);
 };
-
-// gui.add(iss.position, "x").min(-300).max(300).step(1).name("issX");
 
 const clock = new THREE.Clock();
 
@@ -336,6 +378,6 @@ const animate = () => {
 
 setInterval(() => {
   getISS();
-}, 10000);
+}, 3000);
 
 animate();
