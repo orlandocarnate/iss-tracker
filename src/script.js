@@ -7,6 +7,11 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import gsap from "gsap";
 import { issLocation, convertToRadians } from "./issdata.js";
 
+import vertexShader from './shaders/vertex.glsl';
+import fragmentShader from './shaders/fragment.glsl';
+import atmosVertexShader from './shaders/atmosVertex.glsl';
+import atmosFragmentShader from './shaders/atmosFragment.glsl';
+
 // Debug
 const gui = new dat.GUI();
 dat.GUI.toggleHide();
@@ -37,6 +42,14 @@ const sizes = {
   height: window.innerHeight,
 };
 
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true
+});
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.getElementById("canvas").appendChild(renderer.domElement);
+
 window.addEventListener("resize", () => {
   // Update sizes
   sizes.width = window.innerWidth;
@@ -51,9 +64,6 @@ window.addEventListener("resize", () => {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
 
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.getElementById("canvas").appendChild(renderer.domElement);
 
 /** \
  * Camera
@@ -87,7 +97,7 @@ const directionalLight = new THREE.DirectionalLight("#fcffbe", 1);
 // directionalLight.shadow.camera.far = 15;
 // directionalLight.shadow.mapSize.set(1024, 1024);
 // directionalLight.shadow.normalBias = 0.05;
-directionalLight.position.set(90, -80, 145);
+// directionalLight.position.set(90, -80, 145);
 
 const directionalLight2 = new THREE.DirectionalLight("#bee2ff", 1);
 directionalLight2.position.set(0, 120, -180);
@@ -198,19 +208,37 @@ earthTexture.wrapT = THREE.RepeatWrapping;
 // earthTexture.offset.set(0.5, 0);
 
 const sphere = new THREE.SphereGeometry(90, 32, 32);
-const sphereMaterial = new THREE.MeshStandardMaterial({
-  //   color: 0x555555,
-  map: earthTexture,
-  roughness: 0.5,
-  metalness: 0.2,
-  normalMap: earthNormalMap,
-  roughnessMap: earthRoughMap,
+const sphereMaterial = new THREE.ShaderMaterial({
+  vertexShader,
+  fragmentShader,
+  uniforms: {
+    uEarthTexture: {
+      value: new THREE.TextureLoader().load("images/earth_atmos_2048.jpg")
+    }
+  },
+  // map: earthTexture,
+  // roughness: 0.5,
+  // metalness: 0.2,
+  // normalMap: earthNormalMap,
+  // roughnessMap: earthRoughMap,
   // wireframe: true,
 });
+
 const earth = new THREE.Mesh(sphere, sphereMaterial);
 earth.rotation.y = 1 * Math.PI;
 scene.add(earth);
 
+// atmospheric glow
+const sphere2 = new THREE.SphereGeometry(95, 32, 32);
+const atmosphereMaterial = new THREE.ShaderMaterial({
+  vertexShader: atmosVertexShader,
+  fragmentShader: atmosFragmentShader,
+  blending: THREE.AdditiveBlending,
+  side: THREE.BackSide
+});
+
+const atmosphere = new THREE.Mesh(sphere2, atmosphereMaterial);
+scene.add(atmosphere);
 /**
  * Plot Previous Path Lines
  */
@@ -317,7 +345,7 @@ gltfLoader.load(
         points.push(prevPoint);
       });
 
-    
+
     scene.add(iss);
 
   },
