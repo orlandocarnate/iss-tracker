@@ -12,6 +12,11 @@ import fragmentShader from './shaders/fragment.glsl';
 import atmosVertexShader from './shaders/atmosVertex.glsl';
 import atmosFragmentShader from './shaders/atmosFragment.glsl';
 
+// import icon from "./assets/images/GitHub-Mark-Light-32px.png";
+// const gitIcon = new Image();
+// gitIcon.src = icon;
+// document.getElementById("githublogo").appendChild(gitIcon);
+
 // Debug
 const gui = new dat.GUI();
 dat.GUI.toggleHide();

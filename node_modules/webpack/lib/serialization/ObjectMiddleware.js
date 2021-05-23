@@ -208,12 +208,14 @@ class ObjectMiddleware extends SerializerMiddleware {
 	}
 
 	static getSerializerFor(object) {
-		let c = object.constructor;
-		if (!c) {
-			if (Object.getPrototypeOf(object) === null) {
-				// Object created with Object.create(null)
-				c = null;
-			} else {
+		const proto = Object.getPrototypeOf(object);
+		let c;
+		if (proto === null) {
+			// Object created with Object.create(null)
+			c = null;
+		} else {
+			c = proto.constructor;
+			if (!c) {
 				throw new Error(
 					"Serialization of objects with prototype without valid constructor property not possible"
 				);
@@ -238,6 +240,12 @@ class ObjectMiddleware extends SerializerMiddleware {
 		return serializer;
 	}
 
+	static _getDeserializerForWithoutError(request, name) {
+		const key = request + "/" + name;
+		const serializer = serializerInversed.get(key);
+		return serializer;
+	}
+
 	/**
 	 * @param {DeserializedType} data data
 	 * @param {Object} context context object
@@ -245,13 +253,13 @@ class ObjectMiddleware extends SerializerMiddleware {
 	 */
 	serialize(data, context) {
 		/** @type {any[]} */
-		const result = [CURRENT_VERSION];
+		let result = [CURRENT_VERSION];
 		let currentPos = 0;
-		const referenceable = new Map();
+		let referenceable = new Map();
 		const addReferenceable = item => {
 			referenceable.set(item, currentPos++);
 		};
-		const bufferDedupeMap = new Map();
+		let bufferDedupeMap = new Map();
 		const dedupeBuffer = buf => {
 			const len = buf.length;
 			const entry = bufferDedupeMap.get(len);
@@ -314,7 +322,7 @@ class ObjectMiddleware extends SerializerMiddleware {
 			}
 		};
 		let currentPosTypeLookup = 0;
-		const objectTypeLookup = new Map();
+		let objectTypeLookup = new Map();
 		const cycleStack = new Set();
 		const stackToString = item => {
 			const arr = Array.from(cycleStack);
@@ -362,7 +370,7 @@ class ObjectMiddleware extends SerializerMiddleware {
 				.join(" -> ");
 		};
 		let hasDebugInfoAttached;
-		const ctx = {
+		let ctx = {
 			write(value, key) {
 				try {
 					process(value);
@@ -377,6 +385,9 @@ class ObjectMiddleware extends SerializerMiddleware {
 					}
 					throw e;
 				}
+			},
+			setCircularReference(ref) {
+				addReferenceable(ref);
 			},
 			snapshot() {
 				return {
@@ -400,16 +411,13 @@ class ObjectMiddleware extends SerializerMiddleware {
 		};
 		this.extendContext(ctx);
 		const process = item => {
-			// check if we can emit a reference
-			const ref = referenceable.get(item);
-
-			if (ref !== undefined) {
-				result.push(ESCAPE, ref - currentPos);
-
-				return;
-			}
-
 			if (Buffer.isBuffer(item)) {
+				// check if we can emit a reference
+				const ref = referenceable.get(item);
+				if (ref !== undefined) {
+					result.push(ESCAPE, ref - currentPos);
+					return;
+				}
 				const alreadyUsedBuffer = dedupeBuffer(item);
 				if (alreadyUsedBuffer !== item) {
 					const ref = referenceable.get(alreadyUsedBuffer);
@@ -423,14 +431,27 @@ class ObjectMiddleware extends SerializerMiddleware {
 				addReferenceable(item);
 
 				result.push(item);
-			} else if (typeof item === "object" && item !== null) {
-				if (cycleStack.has(item)) {
-					throw new Error(`Circular references can't be serialized`);
+			} else if (item === ESCAPE) {
+				result.push(ESCAPE, ESCAPE_ESCAPE_VALUE);
+			} else if (
+				typeof item === "object"
+				// We don't have to check for null as ESCAPE is null and this has been checked before
+			) {
+				// check if we can emit a reference
+				const ref = referenceable.get(item);
+				if (ref !== undefined) {
+					result.push(ESCAPE, ref - currentPos);
+					return;
 				}
 
-				const { request, name, serializer } = ObjectMiddleware.getSerializerFor(
-					item
-				);
+				if (cycleStack.has(item)) {
+					throw new Error(
+						`This is a circular references. To serialize circular references use 'setCircularReference' somewhere in the circle during serialize and deserialize.`
+					);
+				}
+
+				const { request, name, serializer } =
+					ObjectMiddleware.getSerializerFor(item);
 				const key = `${request}/${name}`;
 				const lastIndex = objectTypeLookup.get(key);
 
@@ -456,6 +477,12 @@ class ObjectMiddleware extends SerializerMiddleware {
 			} else if (typeof item === "string") {
 				if (item.length > 1) {
 					// short strings are shorter when not emitting a reference (this saves 1 byte per empty string)
+					// check if we can emit a reference
+					const ref = referenceable.get(item);
+					if (ref !== undefined) {
+						result.push(ESCAPE, ref - currentPos);
+						return;
+					}
 					addReferenceable(item);
 				}
 
@@ -468,15 +495,12 @@ class ObjectMiddleware extends SerializerMiddleware {
 				}
 
 				result.push(item);
-			} else if (item === ESCAPE) {
-				result.push(ESCAPE, ESCAPE_ESCAPE_VALUE);
 			} else if (typeof item === "function") {
 				if (!SerializerMiddleware.isLazy(item))
 					throw new Error("Unexpected function " + item);
 				/** @type {SerializedType} */
-				const serializedData = SerializerMiddleware.getLazySerializedValue(
-					item
-				);
+				const serializedData =
+					SerializerMiddleware.getLazySerializedValue(item);
 				if (serializedData !== undefined) {
 					if (typeof serializedData === "function") {
 						result.push(serializedData);
@@ -503,13 +527,24 @@ class ObjectMiddleware extends SerializerMiddleware {
 			for (const item of data) {
 				process(item);
 			}
+			return result;
 		} catch (e) {
 			if (e === NOT_SERIALIZABLE) return null;
 
 			throw e;
+		} finally {
+			// Get rid of these references to avoid leaking memory
+			// This happens because the optimized code v8 generates
+			// is optimized for our "ctx.write" method so it will reference
+			// it from e. g. Dependency.prototype.serialize -(IC)-> ctx.write
+			data =
+				result =
+				referenceable =
+				bufferDedupeMap =
+				objectTypeLookup =
+				ctx =
+					undefined;
 		}
-
-		return result;
 	}
 
 	/**
@@ -537,10 +572,13 @@ class ObjectMiddleware extends SerializerMiddleware {
 		};
 		let currentPosTypeLookup = 0;
 		let objectTypeLookup = [];
-		const result = [];
-		const ctx = {
+		let result = [];
+		let ctx = {
 			read() {
 				return decodeValue();
+			},
+			setCircularReference(ref) {
+				addReferenceable(ref);
 			},
 			...context
 		};
@@ -559,14 +597,15 @@ class ObjectMiddleware extends SerializerMiddleware {
 					throw new Error(
 						`Unexpected end of object at position ${currentDataPos - 1}`
 					);
-				} else if (typeof nextItem === "number" && nextItem < 0) {
-					// relative reference
-					return referenceable[currentPos + nextItem];
 				} else {
 					const request = nextItem;
 					let serializer;
 
 					if (typeof request === "number") {
+						if (request < 0) {
+							// relative reference
+							return referenceable[currentPos + request];
+						}
 						serializer = objectTypeLookup[currentPosTypeLookup - request];
 					} else {
 						if (typeof request !== "string") {
@@ -577,24 +616,31 @@ class ObjectMiddleware extends SerializerMiddleware {
 						}
 						const name = read();
 
-						if (request && !loadedRequests.has(request)) {
-							let loaded = false;
-							for (const [regExp, loader] of loaders) {
-								if (regExp.test(request)) {
-									if (loader(request)) {
-										loaded = true;
-										break;
+						serializer = ObjectMiddleware._getDeserializerForWithoutError(
+							request,
+							name
+						);
+
+						if (serializer === undefined) {
+							if (request && !loadedRequests.has(request)) {
+								let loaded = false;
+								for (const [regExp, loader] of loaders) {
+									if (regExp.test(request)) {
+										if (loader(request)) {
+											loaded = true;
+											break;
+										}
 									}
 								}
-							}
-							if (!loaded) {
-								require(request);
+								if (!loaded) {
+									require(request);
+								}
+
+								loadedRequests.add(request);
 							}
 
-							loadedRequests.add(request);
+							serializer = ObjectMiddleware.getDeserializerFor(request, name);
 						}
-
-						serializer = ObjectMiddleware.getDeserializerFor(request, name);
 
 						objectTypeLookup.push(serializer);
 						currentPosTypeLookup++;
@@ -658,16 +704,18 @@ class ObjectMiddleware extends SerializerMiddleware {
 			}
 		};
 
-		while (currentDataPos < data.length) {
-			result.push(decodeValue());
+		try {
+			while (currentDataPos < data.length) {
+				result.push(decodeValue());
+			}
+			return result;
+		} finally {
+			// Get rid of these references to avoid leaking memory
+			// This happens because the optimized code v8 generates
+			// is optimized for our "ctx.read" method so it will reference
+			// it from e. g. Dependency.prototype.deserialize -(IC)-> ctx.read
+			result = referenceable = data = objectTypeLookup = ctx = undefined;
 		}
-
-		// Help the GC, as functions above might be cached in inline caches
-		referenceable = undefined;
-		objectTypeLookup = undefined;
-		data = undefined;
-
-		return result;
 	}
 }
 

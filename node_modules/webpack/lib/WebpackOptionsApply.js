@@ -43,10 +43,11 @@ const RequireEnsurePlugin = require("./dependencies/RequireEnsurePlugin");
 const RequireIncludePlugin = require("./dependencies/RequireIncludePlugin");
 const SystemPlugin = require("./dependencies/SystemPlugin");
 const URLPlugin = require("./dependencies/URLPlugin");
+const WorkerPlugin = require("./dependencies/WorkerPlugin");
 
 const InferAsyncModulesPlugin = require("./async-modules/InferAsyncModulesPlugin");
 
-const FlagUsingEvalPlugin = require("./FlagUsingEvalPlugin");
+const JavascriptMetaInfoPlugin = require("./JavascriptMetaInfoPlugin");
 const DefaultStatsFactoryPlugin = require("./stats/DefaultStatsFactoryPlugin");
 const DefaultStatsPresetPlugin = require("./stats/DefaultStatsPresetPlugin");
 const DefaultStatsPrinterPlugin = require("./stats/DefaultStatsPrinterPlugin");
@@ -71,6 +72,14 @@ class WebpackOptionsApply extends OptionsApply {
 		compiler.recordsInputPath = options.recordsInputPath || null;
 		compiler.recordsOutputPath = options.recordsOutputPath || null;
 		compiler.name = options.name;
+
+		if (options.externals) {
+			//@ts-expect-error https://github.com/microsoft/TypeScript/issues/41697
+			const ExternalsPlugin = require("./ExternalsPlugin");
+			new ExternalsPlugin(options.externalsType, options.externals).apply(
+				compiler
+			);
+		}
 
 		if (options.externalsPresets.node) {
 			const NodeTargetPlugin = require("./node/NodeTargetPlugin");
@@ -162,19 +171,18 @@ class WebpackOptionsApply extends OptionsApply {
 			}
 		}
 
-		if (options.externals) {
-			//@ts-expect-error https://github.com/microsoft/TypeScript/issues/41697
-			const ExternalsPlugin = require("./ExternalsPlugin");
-			new ExternalsPlugin(options.externalsType, options.externals).apply(
-				compiler
-			);
-		}
-
 		if (options.output.pathinfo) {
 			const ModuleInfoHeaderPlugin = require("./ModuleInfoHeaderPlugin");
 			new ModuleInfoHeaderPlugin(options.output.pathinfo !== true).apply(
 				compiler
 			);
+		}
+
+		if (options.output.clean) {
+			const CleanPlugin = require("./CleanPlugin");
+			new CleanPlugin(
+				options.output.clean === true ? {} : options.output.clean
+			).apply(compiler);
 		}
 
 		if (options.devtool) {
@@ -246,22 +254,24 @@ class WebpackOptionsApply extends OptionsApply {
 
 		if (options.experiments.lazyCompilation) {
 			const LazyCompilationPlugin = require("./hmr/LazyCompilationPlugin");
+			const lazyOptions =
+				typeof options.experiments.lazyCompilation === "object"
+					? options.experiments.lazyCompilation
+					: null;
 			new LazyCompilationPlugin({
 				backend:
-					(typeof options.experiments.lazyCompilation === "object" &&
-						options.experiments.lazyCompilation.backend) ||
+					(lazyOptions && lazyOptions.backend) ||
 					require("./hmr/lazyCompilationBackend"),
 				client:
-					(typeof options.experiments.lazyCompilation === "object" &&
-						options.experiments.lazyCompilation.client) ||
+					(lazyOptions && lazyOptions.client) ||
 					require.resolve(
 						`../hot/lazy-compilation-${
 							options.externalsPresets.node ? "node" : "web"
 						}.js`
 					),
-				entries:
-					typeof options.experiments.lazyCompilation !== "object" ||
-					options.experiments.lazyCompilation.entries !== false
+				entries: !lazyOptions || lazyOptions.entries !== false,
+				imports: !lazyOptions || lazyOptions.imports !== false,
+				test: (lazyOptions && lazyOptions.test) || undefined
 			}).apply(compiler);
 		}
 
@@ -286,7 +296,9 @@ class WebpackOptionsApply extends OptionsApply {
 			new RequireJsStuffPlugin().apply(compiler);
 		}
 		new CommonJsPlugin().apply(compiler);
-		new LoaderPlugin().apply(compiler);
+		new LoaderPlugin({
+			enableExecuteModule: options.experiments.executeModule
+		}).apply(compiler);
 		if (options.node !== false) {
 			const NodeStuffPlugin = require("./NodeStuffPlugin");
 			new NodeStuffPlugin(options.node).apply(compiler);
@@ -303,17 +315,16 @@ class WebpackOptionsApply extends OptionsApply {
 		new SystemPlugin().apply(compiler);
 		new ImportMetaPlugin().apply(compiler);
 		new URLPlugin().apply(compiler);
-
-		if (options.output.workerChunkLoading) {
-			const WorkerPlugin = require("./dependencies/WorkerPlugin");
-			new WorkerPlugin(options.output.workerChunkLoading).apply(compiler);
-		}
+		new WorkerPlugin(
+			options.output.workerChunkLoading,
+			options.output.workerWasmLoading
+		).apply(compiler);
 
 		new DefaultStatsFactoryPlugin().apply(compiler);
 		new DefaultStatsPresetPlugin().apply(compiler);
 		new DefaultStatsPrinterPlugin().apply(compiler);
 
-		new FlagUsingEvalPlugin().apply(compiler);
+		new JavascriptMetaInfoPlugin().apply(compiler);
 
 		if (typeof options.mode !== "string") {
 			const WarnNoModeSetPlugin = require("./WarnNoModeSetPlugin");
@@ -512,9 +523,17 @@ class WebpackOptionsApply extends OptionsApply {
 			const cacheOptions = options.cache;
 			switch (cacheOptions.type) {
 				case "memory": {
-					//@ts-expect-error https://github.com/microsoft/TypeScript/issues/41697
-					const MemoryCachePlugin = require("./cache/MemoryCachePlugin");
-					new MemoryCachePlugin().apply(compiler);
+					if (isFinite(cacheOptions.maxGenerations)) {
+						//@ts-expect-error https://github.com/microsoft/TypeScript/issues/41697
+						const MemoryWithGcCachePlugin = require("./cache/MemoryWithGcCachePlugin");
+						new MemoryWithGcCachePlugin({
+							maxGenerations: cacheOptions.maxGenerations
+						}).apply(compiler);
+					} else {
+						//@ts-expect-error https://github.com/microsoft/TypeScript/issues/41697
+						const MemoryCachePlugin = require("./cache/MemoryCachePlugin");
+						new MemoryCachePlugin().apply(compiler);
+					}
 					break;
 				}
 				case "filesystem": {
@@ -523,9 +542,17 @@ class WebpackOptionsApply extends OptionsApply {
 						const list = cacheOptions.buildDependencies[key];
 						new AddBuildDependenciesPlugin(list).apply(compiler);
 					}
-					//@ts-expect-error https://github.com/microsoft/TypeScript/issues/41697
-					const MemoryCachePlugin = require("./cache/MemoryCachePlugin");
-					new MemoryCachePlugin().apply(compiler);
+					if (!isFinite(cacheOptions.maxMemoryGenerations)) {
+						//@ts-expect-error https://github.com/microsoft/TypeScript/issues/41697
+						const MemoryCachePlugin = require("./cache/MemoryCachePlugin");
+						new MemoryCachePlugin().apply(compiler);
+					} else if (cacheOptions.maxMemoryGenerations !== 0) {
+						//@ts-expect-error https://github.com/microsoft/TypeScript/issues/41697
+						const MemoryWithGcCachePlugin = require("./cache/MemoryWithGcCachePlugin");
+						new MemoryWithGcCachePlugin({
+							maxGenerations: cacheOptions.maxMemoryGenerations
+						}).apply(compiler);
+					}
 					switch (cacheOptions.store) {
 						case "pack": {
 							const IdleFileCachePlugin = require("./cache/IdleFileCachePlugin");
@@ -540,7 +567,10 @@ class WebpackOptionsApply extends OptionsApply {
 									logger: compiler.getInfrastructureLogger(
 										"webpack.cache.PackFileCacheStrategy"
 									),
-									snapshot: options.snapshot
+									snapshot: options.snapshot,
+									maxAge: cacheOptions.maxAge,
+									profile: cacheOptions.profile,
+									allowCollectingMemory: cacheOptions.allowCollectingMemory
 								}),
 								cacheOptions.idleTimeout,
 								cacheOptions.idleTimeoutForInitialStore

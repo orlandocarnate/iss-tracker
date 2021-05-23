@@ -91,7 +91,9 @@ class EvalSourceMapDevToolPlugin {
 						} else if (m instanceof ConcatenatedModule) {
 							const concatModule = /** @type {ConcatenatedModule} */ (m);
 							if (concatModule.rootModule instanceof NormalModule) {
-								const module = /** @type {NormalModule} */ (concatModule.rootModule);
+								const module = /** @type {NormalModule} */ (
+									concatModule.rootModule
+								);
 								if (!matchModule(module.resource)) {
 									return result(source);
 								}
@@ -165,6 +167,10 @@ class EvalSourceMapDevToolPlugin {
 							new RawSource(`eval(${JSON.stringify(content + footer)});`)
 						);
 					}
+				);
+				hooks.inlineInRuntimeBailout.tap(
+					"EvalDevToolModulePlugin",
+					() => "the eval-source-map devtool is used."
 				);
 				hooks.render.tap(
 					"EvalSourceMapDevToolPlugin",
