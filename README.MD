@@ -1,8 +1,9 @@
 # ISS Tracker using Three.js
+An International Space Station Tracker. Visualized using Three.js framework which uses Open Notify's ISS API to retrieve the current ISS location and place it in proper orbit over the Earth in real-time.
+ISS was modeled in 3DS Max and exported as a GLTF file.
 
-## NPM Packages
-
-- GSAP
+Screenshot
+![Three.js ISS Tracker](./isstracker.jpg)
 
 ## ISS Tracker API
 
@@ -12,10 +13,12 @@ http://open-notify.org/Open-Notify-API/ISS-Location-Now/
 
 https://stackoverflow.com/questions/1185408/converting-from-longitude-latitude-to-cartesian-coordinates
 
-## How to deploy to Github Pages
+## Main NPM Packages
+* Three.js
 
-https://medium.com/linagora-engineering/deploying-your-js-app-to-github-pages-the-easy-way-or-not-1ef8c48424b7
+## Installation
+* With node.js and npm installed, you can clone my repository then in the root folder run the command `npm install`
+* run with the command `npm run dev`
 
 ## Custom Shaders
-
-Custom shaders by [Chris Courses Youtube tutorial](https://youtu.be/vM8M4QloVL0)
+The Earth's atmospheric glow was made as a custom shader. I learned how to do it from [Chris Courses Youtube tutorial](https://youtu.be/vM8M4QloVL0)
