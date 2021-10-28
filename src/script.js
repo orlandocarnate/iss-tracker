@@ -12,6 +12,8 @@ import fragmentShader from './shaders/fragment.glsl';
 import atmosVertexShader from './shaders/atmosVertex.glsl';
 import atmosFragmentShader from './shaders/atmosFragment.glsl';
 
+import FpsStats from 'stats.js'
+
 // import icon from "./assets/images/GitHub-Mark-Light-32px.png";
 // const gitIcon = new Image();
 // gitIcon.src = icon;
@@ -398,7 +400,16 @@ const clock = new THREE.Clock();
 
 let time = Date.now();
 
+/**
+ * STATS
+ */
+const fpsStats = new FpsStats();
+fpsStats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+document.body.appendChild(fpsStats.dom);
+
 const animate = () => {
+  fpsStats.begin()
+
   requestAnimationFrame(animate);
 
   // getISS();
@@ -407,6 +418,8 @@ const animate = () => {
   controls.update();
 
   renderer.render(scene, camera);
+
+  fpsStats.end()
 };
 
 setInterval(() => {

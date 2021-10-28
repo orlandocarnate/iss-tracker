@@ -75,6 +75,8 @@ p {
 
 /* The button used to open the sidebar */
 .openbtn {
+  position: relative;
+  top: 30px;
   font-size: 20px;
   cursor: pointer;
   background-color: rgb(0, 119, 255);
