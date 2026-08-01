@@ -21,13 +21,8 @@ export class ThreeSceneService {
   private readonly pointer = new THREE.Vector2();
   private readonly pointerDown = new THREE.Vector2();
   private readonly followCameraDistance = INITIAL_CAMERA_RADIUS;
-  private readonly trajectoryMaterial = new THREE.LineDashedMaterial({
-    color: 0xffff00,
-    dashSize: 3,
-    gapSize: 10,
-    scale: 10
-  });
-  private readonly liveConnectorMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
+  private readonly trajectoryMaterial = new THREE.LineBasicMaterial({ vertexColors: true });
+  private readonly liveConnectorMaterial = new THREE.LineBasicMaterial({ color: 0x8b00ff });
 
   private controls?: OrbitControls;
   private iss?: THREE.Object3D;
@@ -182,8 +177,8 @@ export class ThreeSceneService {
 
     const points = samples.map((sample) => this.toCartesian(sample));
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    geometry.setAttribute('color', this.createTrajectoryColors(points.length));
     this.trajectoryLine = new THREE.Line(geometry, this.trajectoryMaterial);
-    this.trajectoryLine.computeLineDistances();
     this.scene.add(this.trajectoryLine);
 
     this.liveConnectorStart = points.at(-1)?.clone();
@@ -301,6 +296,19 @@ export class ThreeSceneService {
     positions.setXYZ(1, this.iss.position.x, this.iss.position.y, this.iss.position.z);
     positions.needsUpdate = true;
     this.liveConnector.geometry.computeBoundingSphere();
+  }
+
+  private createTrajectoryColors(pointCount: number): THREE.BufferAttribute {
+    const colors = new Float32Array(pointCount * 3);
+    const color = new THREE.Color();
+
+    for (let index = 0; index < pointCount; index += 1) {
+      const progress = pointCount > 1 ? index / (pointCount - 1) : 0;
+      color.setHSL(progress * 0.75, 1, 0.5);
+      colors.set([color.r, color.g, color.b], index * 3);
+    }
+
+    return new THREE.BufferAttribute(colors, 3);
   }
 
   private scheduleFollowResume(): void {
