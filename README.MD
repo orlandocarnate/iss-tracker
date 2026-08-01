@@ -22,7 +22,7 @@ The application will be migrated from the current Webpack/imperative JavaScript 
 - **Polling cadence:** every five seconds
 - **Deployment protocol:** HTTP, because Open Notify is available only over HTTP
 - **Trajectory:** collected in the browser from live API samples
-- **Historical trajectory:** fetched once from Where the ISS At when the tracker starts
+- **Historical trajectory:** fetched once from Where the ISS At for the six hours ending at the first live Open Notify timestamp
 - **Model motion:** animated through collected trajectory samples while continuing to receive live position updates
 - **Orbit scale:** proportional to the Earth sphere radius and the documented 408 km ISS altitude, because Open Notify does not provide altitude
 - **Unavailable telemetry:** velocity and visibility are removed because Open Notify does not provide them

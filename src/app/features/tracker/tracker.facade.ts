@@ -17,9 +17,9 @@ export class TrackerFacade {
   readonly trajectory = signal<readonly IssPosition[]>([]);
   readonly error = signal<string | null>(null);
   readonly loading = signal(true);
+  private historicalTrajectoryRequested = false;
 
   constructor() {
-    this.loadHistoricalTrajectory();
     timer(0, POLL_INTERVAL_MS)
       .pipe(
         switchMap(() =>
@@ -38,9 +38,9 @@ export class TrackerFacade {
       .subscribe((position) => this.updatePosition(position));
   }
 
-  private loadHistoricalTrajectory(): void {
+  private loadHistoricalTrajectory(endTimestamp: number): void {
     this.api
-      .getHistoricalTrajectory()
+      .getHistoricalTrajectory(endTimestamp)
       .pipe(
         catchError((error: unknown) => {
           this.error.set(
@@ -66,6 +66,11 @@ export class TrackerFacade {
 
       return this.mergeTrajectory(samples, [position]);
     });
+
+    if (!this.historicalTrajectoryRequested) {
+      this.historicalTrajectoryRequested = true;
+      this.loadHistoricalTrajectory(position.timestamp);
+    }
   }
 
   private mergeTrajectory(

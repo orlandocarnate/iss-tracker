@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { map } from 'rxjs';
+import { forkJoin, map } from 'rxjs';
 
 import {
   IssPosition,
@@ -11,8 +11,9 @@ import {
 const ISS_LOCATION_URL = 'http://api.open-notify.org/iss-now.json';
 const ISS_TRAJECTORY_URL = 'https://api.wheretheiss.at/v1/satellites/25544/positions';
 const ISS_ALTITUDE_KM = 408;
-const TRAJECTORY_SAMPLE_COUNT = 10;
+const TRAJECTORY_DURATION_SECONDS = 6 * 60 * 60;
 const TRAJECTORY_SAMPLE_INTERVAL_SECONDS = 300;
+const TRAJECTORY_BATCH_SIZE = 10;
 
 @Injectable({ providedIn: 'root' })
 export class IssApiService {
@@ -24,13 +25,22 @@ export class IssApiService {
     );
   }
 
-  getHistoricalTrajectory() {
-    const timestamps = this.createTrajectoryTimestamps();
-    return this.http
-      .get<WhereTheIssPosition[]>(ISS_TRAJECTORY_URL, {
-        params: { timestamps: timestamps.join(',') }
+  getHistoricalTrajectory(endTimestamp: number) {
+    const timestamps = this.createTrajectoryTimestamps(endTimestamp);
+    const requests = this.chunkTimestamps(timestamps).map((timestampBatch) =>
+      this.http.get<WhereTheIssPosition[]>(ISS_TRAJECTORY_URL, {
+        params: { timestamps: timestampBatch.join(',') }
       })
-      .pipe(map((positions) => positions.map((position) => this.toHistoricalPosition(position))));
+    );
+
+    return forkJoin(requests).pipe(
+      map((batches) =>
+        batches
+          .flat()
+          .map((position) => this.toHistoricalPosition(position))
+          .sort((left, right) => left.timestamp - right.timestamp)
+      )
+    );
   }
 
   private toIssPosition(response: OpenNotifyIssResponse): IssPosition {
@@ -66,11 +76,21 @@ export class IssApiService {
     };
   }
 
-  private createTrajectoryTimestamps(): number[] {
-    const now = Math.floor(Date.now() / 1_000);
+  private createTrajectoryTimestamps(endTimestamp: number): number[] {
+    const startTimestamp = endTimestamp - TRAJECTORY_DURATION_SECONDS;
+    const sampleCount = TRAJECTORY_DURATION_SECONDS / TRAJECTORY_SAMPLE_INTERVAL_SECONDS;
+
     return Array.from(
-      { length: TRAJECTORY_SAMPLE_COUNT },
-      (_, index) => now - (TRAJECTORY_SAMPLE_COUNT - index - 1) * TRAJECTORY_SAMPLE_INTERVAL_SECONDS
+      { length: sampleCount + 1 },
+      (_, index) => startTimestamp + index * TRAJECTORY_SAMPLE_INTERVAL_SECONDS
     );
+  }
+
+  private chunkTimestamps(timestamps: readonly number[]): number[][] {
+    const batches: number[][] = [];
+    for (let start = 0; start < timestamps.length; start += TRAJECTORY_BATCH_SIZE) {
+      batches.push(timestamps.slice(start, start + TRAJECTORY_BATCH_SIZE));
+    }
+    return batches;
   }
 }

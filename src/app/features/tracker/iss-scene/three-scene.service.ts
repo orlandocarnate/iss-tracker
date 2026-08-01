@@ -17,6 +17,7 @@ export class ThreeSceneService {
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
   private readonly pointerDown = new THREE.Vector2();
+  private readonly followCameraDistance = 60;
   private readonly trajectoryMaterial = new THREE.LineDashedMaterial({
     color: 0xffff00,
     dashSize: 3,
@@ -34,6 +35,7 @@ export class ThreeSceneService {
   private resizeObserver?: ResizeObserver;
   private initialized = false;
   private followingIss = false;
+  private cameraFollowDistance = this.followCameraDistance;
 
   async initialize(host: HTMLElement): Promise<void> {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -46,10 +48,11 @@ export class ThreeSceneService {
     this.controls.autoRotate = true;
     this.controls.autoRotateSpeed = -0.01;
     this.controls.enablePan = false;
-    this.controls.minDistance = 105;
-    this.controls.addEventListener('start', this.stopFollowing);
+    this.controls.minDistance = 5;
     this.renderer.domElement.addEventListener('pointerdown', this.recordPointerDown);
+    this.renderer.domElement.addEventListener('pointermove', this.stopFollowingOnOrbit);
     this.renderer.domElement.addEventListener('pointerup', this.selectIss);
+    this.renderer.domElement.addEventListener('wheel', this.captureFollowZoom, { passive: true });
 
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.8));
     this.scene.add(new THREE.DirectionalLight('#fcffbe', 1));
@@ -83,9 +86,10 @@ export class ThreeSceneService {
     this.resizeObserver?.disconnect();
     this.renderer.setAnimationLoop(null);
     this.controls?.dispose();
-    this.controls?.removeEventListener('start', this.stopFollowing);
     this.renderer.domElement.removeEventListener('pointerdown', this.recordPointerDown);
+    this.renderer.domElement.removeEventListener('pointermove', this.stopFollowingOnOrbit);
     this.renderer.domElement.removeEventListener('pointerup', this.selectIss);
+    this.renderer.domElement.removeEventListener('wheel', this.captureFollowZoom);
     this.trajectoryMaterial.dispose();
     this.liveConnectorMaterial.dispose();
     this.scene.traverse((object) => {
@@ -245,11 +249,20 @@ export class ThreeSceneService {
 
     if (this.raycaster.intersectObject(this.hitSphere).length > 0) {
       this.followingIss = true;
+      this.cameraFollowDistance = this.followCameraDistance;
     }
   };
 
-  private readonly stopFollowing = (): void => {
-    this.followingIss = false;
+  private readonly stopFollowingOnOrbit = (event: PointerEvent): void => {
+    if (event.buttons !== 0 && this.pointerDown.distanceTo(new THREE.Vector2(event.clientX, event.clientY)) > 5) {
+      this.followingIss = false;
+    }
+  };
+
+  private readonly captureFollowZoom = (): void => {
+    if (this.followingIss && this.controls) {
+      this.cameraFollowDistance = this.camera.position.distanceTo(this.controls.target);
+    }
   };
 
   private updateCameraFollow(): void {
@@ -258,7 +271,9 @@ export class ThreeSceneService {
     }
 
     const outward = this.iss.position.clone().normalize();
-    const desiredCameraPosition = this.iss.position.clone().addScaledVector(outward, 60);
+    const desiredCameraPosition = this.iss.position
+      .clone()
+      .addScaledVector(outward, this.cameraFollowDistance);
     this.camera.position.lerp(desiredCameraPosition, 0.05);
     this.controls.target.lerp(this.iss.position, 0.1);
   }
