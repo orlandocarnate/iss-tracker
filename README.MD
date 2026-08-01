@@ -12,9 +12,10 @@ The application will be migrated from the current Webpack/imperative JavaScript 
 4. Convert the page shell into standalone Angular components for the application, ISS statistics, sidebar, and footer. Angular bindings will replace direct DOM mutation and inline event handlers.
 5. Create an `IssSceneComponent`, loaded from the main application template, to own the Three.js canvas lifecycle. A supporting scene service will encapsulate renderer setup, GLTF loading, animation, and GPU-resource disposal.
 6. Load the GLTF model once, position it from the live trajectory stream, and calculate orbital radius from the Earth sphere radius and the documented 408 km ISS altitude: `earthRadiusScene * (1 + altitudeKm / 6371)`.
-7. Restore the initial historical trajectory using the Where the ISS At positions endpoint, while keeping Open Notify as the live source.
-8. Add a selectable hit sphere around the model: selecting it follows the ISS, and manual camera orbit disables following.
-9. Add focused tests for API mapping, trajectory buffering, coordinate projection, and component behavior before updating the deployment pipeline.
+7. Align the equirectangular Earth texture in its shader rather than rotating the Earth mesh or offsetting ISS coordinates.
+8. Restore the initial historical trajectory using the Where the ISS At positions endpoint, while keeping Open Notify as the live source.
+9. Add a selectable hit sphere around the model: selecting it follows the ISS, and manual camera orbit disables following.
+10. Add focused tests for API mapping, trajectory buffering, coordinate projection, and component behavior before updating the deployment pipeline.
 
 ### Agreed data behavior
 

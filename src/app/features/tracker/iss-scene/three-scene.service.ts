@@ -7,6 +7,7 @@ import { IssPosition } from '../../../core/models/iss-position.model';
 
 const EARTH_RADIUS_SCENE = 90;
 const EARTH_RADIUS_KM = 6_371;
+const INITIAL_CAMERA_RADIUS = 160;
 
 @Injectable()
 export class ThreeSceneService {
@@ -34,6 +35,7 @@ export class ThreeSceneService {
   private liveConnectorStart?: THREE.Vector3;
   private resizeObserver?: ResizeObserver;
   private initialized = false;
+  private initialCameraPositioned = false;
   private followingIss = false;
   private cameraFollowDistance = this.followCameraDistance;
 
@@ -77,6 +79,7 @@ export class ThreeSceneService {
 
     if (position) {
       this.targetPosition.copy(this.toCartesian(position));
+      this.positionInitialCamera();
     }
 
     this.replaceTrajectory(trajectory);
@@ -124,10 +127,12 @@ export class ThreeSceneService {
       new THREE.ShaderMaterial({
         vertexShader,
         fragmentShader,
-        uniforms: { uEarthTexture: { value: earthTexture } }
+        uniforms: {
+          uEarthTexture: { value: earthTexture },
+          uTextureLongitudeOffset: { value: 0.5 }
+        }
       })
     );
-    earth.rotation.y = Math.PI;
     this.scene.add(earth);
 
     this.scene.add(
@@ -288,5 +293,16 @@ export class ThreeSceneService {
     positions.setXYZ(1, this.iss.position.x, this.iss.position.y, this.iss.position.z);
     positions.needsUpdate = true;
     this.liveConnector.geometry.computeBoundingSphere();
+  }
+
+  private positionInitialCamera(): void {
+    if (this.initialCameraPositioned || !this.controls) {
+      return;
+    }
+
+    this.camera.position.copy(this.targetPosition.clone().normalize().multiplyScalar(INITIAL_CAMERA_RADIUS));
+    this.controls.target.set(0, 0, 0);
+    this.controls.update();
+    this.initialCameraPositioned = true;
   }
 }
