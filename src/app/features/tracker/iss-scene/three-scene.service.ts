@@ -23,11 +23,14 @@ export class ThreeSceneService {
     gapSize: 10,
     scale: 10
   });
+  private readonly liveConnectorMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
 
   private controls?: OrbitControls;
   private iss?: THREE.Object3D;
   private hitSphere?: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
   private trajectoryLine?: THREE.Line;
+  private liveConnector?: THREE.Line;
+  private liveConnectorStart?: THREE.Vector3;
   private resizeObserver?: ResizeObserver;
   private initialized = false;
   private followingIss = false;
@@ -84,6 +87,7 @@ export class ThreeSceneService {
     this.renderer.domElement.removeEventListener('pointerdown', this.recordPointerDown);
     this.renderer.domElement.removeEventListener('pointerup', this.selectIss);
     this.trajectoryMaterial.dispose();
+    this.liveConnectorMaterial.dispose();
     this.scene.traverse((object) => {
       if (object instanceof THREE.Mesh) {
         object.geometry.dispose();
@@ -151,16 +155,30 @@ export class ThreeSceneService {
   private replaceTrajectory(samples: readonly IssPosition[]): void {
     this.trajectoryLine?.removeFromParent();
     this.trajectoryLine?.geometry.dispose();
+    this.liveConnector?.removeFromParent();
+    this.liveConnector?.geometry.dispose();
 
     if (samples.length < 2) {
       this.trajectoryLine = undefined;
+      this.liveConnector = undefined;
+      this.liveConnectorStart = undefined;
       return;
     }
 
-    const geometry = new THREE.BufferGeometry().setFromPoints(samples.map((sample) => this.toCartesian(sample)));
+    const points = samples.map((sample) => this.toCartesian(sample));
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
     this.trajectoryLine = new THREE.Line(geometry, this.trajectoryMaterial);
     this.trajectoryLine.computeLineDistances();
     this.scene.add(this.trajectoryLine);
+
+    this.liveConnectorStart = points.at(-1)?.clone();
+    if (this.liveConnectorStart) {
+      this.liveConnector = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([this.liveConnectorStart, this.liveConnectorStart]),
+        this.liveConnectorMaterial
+      );
+      this.scene.add(this.liveConnector);
+    }
   }
 
   private toCartesian(position: IssPosition): THREE.Vector3 {
@@ -180,6 +198,7 @@ export class ThreeSceneService {
       this.iss.position.lerp(this.targetPosition, 0.035);
       this.iss.lookAt(0, 0, 0);
       this.hitSphere?.position.copy(this.iss.position);
+      this.updateLiveConnector();
       this.updateCameraFollow();
     }
     this.controls?.update();
@@ -193,7 +212,7 @@ export class ThreeSceneService {
     }
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(width, height, false);
+    this.renderer.setSize(width, height);
   }
 
   private async loadTextAsset(path: string): Promise<string> {
@@ -242,5 +261,17 @@ export class ThreeSceneService {
     const desiredCameraPosition = this.iss.position.clone().addScaledVector(outward, 60);
     this.camera.position.lerp(desiredCameraPosition, 0.05);
     this.controls.target.lerp(this.iss.position, 0.1);
+  }
+
+  private updateLiveConnector(): void {
+    if (!this.liveConnector || !this.liveConnectorStart || !this.iss) {
+      return;
+    }
+
+    const positions = this.liveConnector.geometry.getAttribute('position') as THREE.BufferAttribute;
+    positions.setXYZ(0, this.liveConnectorStart.x, this.liveConnectorStart.y, this.liveConnectorStart.z);
+    positions.setXYZ(1, this.iss.position.x, this.iss.position.y, this.iss.position.z);
+    positions.needsUpdate = true;
+    this.liveConnector.geometry.computeBoundingSphere();
   }
 }
