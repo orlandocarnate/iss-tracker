@@ -9,6 +9,7 @@ const EARTH_RADIUS_SCENE = 90;
 const EARTH_RADIUS_KM = 6_371;
 const INITIAL_CAMERA_RADIUS = 160;
 const FOLLOW_RESUME_DELAY_MS = 30_000;
+const MINIMUM_CAMERA_RADIUS = EARTH_RADIUS_SCENE + 1;
 
 @Injectable()
 export class ThreeSceneService {
@@ -19,7 +20,7 @@ export class ThreeSceneService {
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
   private readonly pointerDown = new THREE.Vector2();
-  private readonly followCameraDistance = 60;
+  private readonly followCameraDistance = INITIAL_CAMERA_RADIUS;
   private readonly trajectoryMaterial = new THREE.LineDashedMaterial({
     color: 0xffff00,
     dashSize: 3,
@@ -52,7 +53,7 @@ export class ThreeSceneService {
     this.controls.autoRotate = true;
     this.controls.autoRotateSpeed = -0.01;
     this.controls.enablePan = false;
-    this.controls.minDistance = 5;
+    this.controls.minDistance = MINIMUM_CAMERA_RADIUS;
     this.renderer.domElement.addEventListener('pointerdown', this.recordPointerDown);
     this.renderer.domElement.addEventListener('pointermove', this.stopFollowingOnOrbit);
     this.renderer.domElement.addEventListener('pointerup', this.selectIss);
@@ -259,7 +260,8 @@ export class ThreeSceneService {
 
     if (this.raycaster.intersectObject(this.hitSphere).length > 0) {
       this.followingIss = true;
-      this.cameraFollowDistance = this.followCameraDistance;
+      this.cameraFollowDistance = Math.max(this.camera.position.length(), MINIMUM_CAMERA_RADIUS);
+      this.controls?.target.set(0, 0, 0);
       this.clearFollowResumeTimer();
     }
   };
@@ -267,6 +269,7 @@ export class ThreeSceneService {
   private readonly stopFollowingOnOrbit = (event: PointerEvent): void => {
     if (event.buttons !== 0 && this.pointerDown.distanceTo(new THREE.Vector2(event.clientX, event.clientY)) > 5) {
       this.followingIss = false;
+      this.controls?.target.set(0, 0, 0);
       this.scheduleFollowResume();
     }
   };
@@ -283,11 +286,9 @@ export class ThreeSceneService {
     }
 
     const outward = this.iss.position.clone().normalize();
-    const desiredCameraPosition = this.iss.position
-      .clone()
-      .addScaledVector(outward, this.cameraFollowDistance);
-    this.camera.position.lerp(desiredCameraPosition, 0.05);
-    this.controls.target.lerp(this.iss.position, 0.1);
+    const nextDirection = this.camera.position.clone().normalize().lerp(outward, 0.05).normalize();
+    this.camera.position.copy(nextDirection.multiplyScalar(this.cameraFollowDistance));
+    this.controls.target.set(0, 0, 0);
   }
 
   private updateLiveConnector(): void {
@@ -306,6 +307,8 @@ export class ThreeSceneService {
     this.clearFollowResumeTimer();
     this.followResumeTimer = setTimeout(() => {
       this.followingIss = true;
+      this.cameraFollowDistance = Math.max(this.camera.position.length(), MINIMUM_CAMERA_RADIUS);
+      this.controls?.target.set(0, 0, 0);
       this.followResumeTimer = undefined;
     }, FOLLOW_RESUME_DELAY_MS);
   }
