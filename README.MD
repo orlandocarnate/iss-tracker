@@ -12,7 +12,9 @@ The application will be migrated from the current Webpack/imperative JavaScript 
 4. Convert the page shell into standalone Angular components for the application, ISS statistics, sidebar, and footer. Angular bindings will replace direct DOM mutation and inline event handlers.
 5. Create an `IssSceneComponent`, loaded from the main application template, to own the Three.js canvas lifecycle. A supporting scene service will encapsulate renderer setup, GLTF loading, animation, and GPU-resource disposal.
 6. Load the GLTF model once, position it from the live trajectory stream, and calculate orbital radius from the Earth sphere radius and the documented 408 km ISS altitude: `earthRadiusScene * (1 + altitudeKm / 6371)`.
-7. Add focused tests for API mapping, trajectory buffering, coordinate projection, and component behavior before updating the deployment pipeline.
+7. Restore the initial historical trajectory using the Where the ISS At positions endpoint, while keeping Open Notify as the live source.
+8. Add a selectable hit sphere around the model: selecting it follows the ISS, and manual camera orbit disables following.
+9. Add focused tests for API mapping, trajectory buffering, coordinate projection, and component behavior before updating the deployment pipeline.
 
 ### Agreed data behavior
 
@@ -20,6 +22,7 @@ The application will be migrated from the current Webpack/imperative JavaScript 
 - **Polling cadence:** every five seconds
 - **Deployment protocol:** HTTP, because Open Notify is available only over HTTP
 - **Trajectory:** collected in the browser from live API samples
+- **Historical trajectory:** fetched once from Where the ISS At when the tracker starts
 - **Model motion:** animated through collected trajectory samples while continuing to receive live position updates
 - **Orbit scale:** proportional to the Earth sphere radius and the documented 408 km ISS altitude, because Open Notify does not provide altitude
 - **Unavailable telemetry:** velocity and visibility are removed because Open Notify does not provide them

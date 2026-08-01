@@ -14,6 +14,9 @@ export class ThreeSceneService {
   private readonly camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1_000);
   private readonly renderer = new THREE.WebGLRenderer({ antialias: true });
   private readonly targetPosition = new THREE.Vector3();
+  private readonly raycaster = new THREE.Raycaster();
+  private readonly pointer = new THREE.Vector2();
+  private readonly pointerDown = new THREE.Vector2();
   private readonly trajectoryMaterial = new THREE.LineDashedMaterial({
     color: 0xffff00,
     dashSize: 3,
@@ -23,9 +26,11 @@ export class ThreeSceneService {
 
   private controls?: OrbitControls;
   private iss?: THREE.Object3D;
+  private hitSphere?: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
   private trajectoryLine?: THREE.Line;
   private resizeObserver?: ResizeObserver;
   private initialized = false;
+  private followingIss = false;
 
   async initialize(host: HTMLElement): Promise<void> {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -39,6 +44,9 @@ export class ThreeSceneService {
     this.controls.autoRotateSpeed = -0.01;
     this.controls.enablePan = false;
     this.controls.minDistance = 105;
+    this.controls.addEventListener('start', this.stopFollowing);
+    this.renderer.domElement.addEventListener('pointerdown', this.recordPointerDown);
+    this.renderer.domElement.addEventListener('pointerup', this.selectIss);
 
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.8));
     this.scene.add(new THREE.DirectionalLight('#fcffbe', 1));
@@ -72,6 +80,9 @@ export class ThreeSceneService {
     this.resizeObserver?.disconnect();
     this.renderer.setAnimationLoop(null);
     this.controls?.dispose();
+    this.controls?.removeEventListener('start', this.stopFollowing);
+    this.renderer.domElement.removeEventListener('pointerdown', this.recordPointerDown);
+    this.renderer.domElement.removeEventListener('pointerup', this.selectIss);
     this.trajectoryMaterial.dispose();
     this.scene.traverse((object) => {
       if (object instanceof THREE.Mesh) {
@@ -129,6 +140,12 @@ export class ThreeSceneService {
     this.iss = gltf.scene;
     this.iss.scale.setScalar(2);
     this.scene.add(this.iss);
+
+    this.hitSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(7, 16, 16),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+    );
+    this.scene.add(this.hitSphere);
   }
 
   private replaceTrajectory(samples: readonly IssPosition[]): void {
@@ -162,6 +179,8 @@ export class ThreeSceneService {
     if (this.iss) {
       this.iss.position.lerp(this.targetPosition, 0.035);
       this.iss.lookAt(0, 0, 0);
+      this.hitSphere?.position.copy(this.iss.position);
+      this.updateCameraFollow();
     }
     this.controls?.update();
     this.renderer.render(this.scene, this.camera);
@@ -187,5 +206,41 @@ export class ThreeSceneService {
 
   private assetUrl(path: string): string {
     return new URL(path, document.baseURI).toString();
+  }
+
+  private readonly recordPointerDown = (event: PointerEvent): void => {
+    this.pointerDown.set(event.clientX, event.clientY);
+  };
+
+  private readonly selectIss = (event: PointerEvent): void => {
+    if (!this.hitSphere || event.button !== 0 || this.pointerDown.distanceTo(new THREE.Vector2(event.clientX, event.clientY)) > 5) {
+      return;
+    }
+
+    const bounds = this.renderer.domElement.getBoundingClientRect();
+    this.pointer.set(
+      ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+      -((event.clientY - bounds.top) / bounds.height) * 2 + 1
+    );
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+
+    if (this.raycaster.intersectObject(this.hitSphere).length > 0) {
+      this.followingIss = true;
+    }
+  };
+
+  private readonly stopFollowing = (): void => {
+    this.followingIss = false;
+  };
+
+  private updateCameraFollow(): void {
+    if (!this.followingIss || !this.iss || !this.controls) {
+      return;
+    }
+
+    const outward = this.iss.position.clone().normalize();
+    const desiredCameraPosition = this.iss.position.clone().addScaledVector(outward, 60);
+    this.camera.position.lerp(desiredCameraPosition, 0.05);
+    this.controls.target.lerp(this.iss.position, 0.1);
   }
 }

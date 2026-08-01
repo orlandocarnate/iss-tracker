@@ -13,3 +13,10 @@ export interface OpenNotifyIssResponse {
     longitude: string;
   };
 }
+
+export interface WhereTheIssPosition {
+  altitude: number;
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+}
