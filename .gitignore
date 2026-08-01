@@ -1,6 +1,16 @@
 reference/
 old/
-node_modules/
-node_modules/*
-dist/
 
+# Dependencies
+/node_modules/
+
+# Angular build and tooling output
+/.angular/
+/dist/
+/coverage/
+
+# Local environment and logs
+.env
+.env.*
+!.env.example
+*.log
