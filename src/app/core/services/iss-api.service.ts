@@ -4,13 +4,11 @@ import { forkJoin, map } from 'rxjs';
 
 import {
   IssPosition,
-  OpenNotifyIssResponse,
   WhereTheIssPosition
 } from '../models/iss-position.model';
 
-const ISS_LOCATION_URL = 'http://api.open-notify.org/iss-now.json';
-const ISS_TRAJECTORY_URL = 'https://api.wheretheiss.at/v1/satellites/25544/positions';
-const ISS_ALTITUDE_KM = 408;
+const ISS_LOCATION_URL = 'https://api.wheretheiss.at/v1/satellites/25544';
+const ISS_TRAJECTORY_URL = `${ISS_LOCATION_URL}/positions`;
 const TRAJECTORY_DURATION_SECONDS = 6 * 60 * 60;
 const TRAJECTORY_SAMPLE_INTERVAL_SECONDS = 300;
 const TRAJECTORY_BATCH_SIZE = 10;
@@ -20,7 +18,7 @@ export class IssApiService {
   private readonly http = inject(HttpClient);
 
   getCurrentPosition() {
-    return this.http.get<OpenNotifyIssResponse>(ISS_LOCATION_URL).pipe(
+    return this.http.get<WhereTheIssPosition>(ISS_LOCATION_URL).pipe(
       map((response) => this.toIssPosition(response))
     );
   }
@@ -43,20 +41,8 @@ export class IssApiService {
     );
   }
 
-  private toIssPosition(response: OpenNotifyIssResponse): IssPosition {
-    const latitude = Number(response.iss_position.latitude);
-    const longitude = Number(response.iss_position.longitude);
-
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      throw new Error('Open Notify returned invalid ISS coordinates.');
-    }
-
-    return {
-      latitude,
-      longitude,
-      altitudeKm: ISS_ALTITUDE_KM,
-      timestamp: response.timestamp
-    };
+  private toIssPosition(response: WhereTheIssPosition): IssPosition {
+    return this.toHistoricalPosition(response);
   }
 
   private toHistoricalPosition(position: WhereTheIssPosition): IssPosition {
@@ -65,7 +51,7 @@ export class IssApiService {
       !Number.isFinite(position.longitude) ||
       !Number.isFinite(position.altitude)
     ) {
-      throw new Error('Where the ISS At returned invalid trajectory coordinates.');
+      throw new Error('Where the ISS At returned invalid ISS coordinates.');
     }
 
     return {

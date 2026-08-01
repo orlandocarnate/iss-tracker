@@ -1,5 +1,5 @@
 # ISS Tracker using Three.js
-An International Space Station Tracker. Visualized using Three.js framework which uses Open Notify's ISS API to retrieve the current ISS location and place it in proper orbit over the Earth in real-time.
+An International Space Station Tracker. Visualized using Three.js framework which uses the Where the ISS At API to retrieve the current ISS location and place it in proper orbit over the Earth in real-time.
 ISS was modeled in 3DS Max and exported as a GLTF file.
 
 ## Angular 22 Migration Plan
@@ -7,8 +7,8 @@ ISS was modeled in 3DS Max and exported as a GLTF file.
 The application will be migrated from the current Webpack/imperative JavaScript implementation to an Angular 22 standalone application. The existing Three.js visualization and static model assets will be retained while responsibilities are split into focused components and services.
 
 1. Create the Angular 22 standalone application shell, configure the existing model, texture, image, and shader assets, and replace the Webpack build pipeline.
-2. Add typed ISS domain models and an `IssApiService` as the only owner of Open Notify API calls.
-3. Poll Open Notify every five seconds and retain the received samples in an in-memory trajectory buffer. This buffer will drive smooth ISS movement and the rendered orbital path.
+2. Add typed ISS domain models and an `IssApiService` as the only owner of Where the ISS At API calls.
+3. Poll Where the ISS At every five seconds and retain the received samples in an in-memory trajectory buffer. This buffer will drive smooth ISS movement and the rendered orbital path.
 4. Convert the page shell into standalone Angular components for the application, ISS statistics, sidebar, and footer. Angular bindings will replace direct DOM mutation and inline event handlers.
 5. Create an `IssSceneComponent`, loaded from the main application template, to own the Three.js canvas lifecycle. A supporting scene service will encapsulate renderer setup, GLTF loading, animation, and GPU-resource disposal.
 6. Load the GLTF model once, position it from the live trajectory stream, and calculate orbital radius from the Earth sphere radius and the documented 408 km ISS altitude: `earthRadiusScene * (1 + altitudeKm / 6371)`.
@@ -19,14 +19,13 @@ The application will be migrated from the current Webpack/imperative JavaScript 
 
 ### Agreed data behavior
 
-- **Live source:** [Open Notify ISS Location Now](http://open-notify.org/Open-Notify-API/ISS-Location-Now/)
+- **Live source:** [Where the ISS At](https://wheretheiss.at/w/developer)
 - **Polling cadence:** every five seconds
-- **Deployment protocol:** HTTP, because Open Notify is available only over HTTP
 - **Trajectory:** collected in the browser from live API samples
-- **Historical trajectory:** fetched once from Where the ISS At for the six hours ending at the first live Open Notify timestamp
+- **Historical trajectory:** fetched once from Where the ISS At for the six hours ending at the first live API timestamp
 - **Model motion:** animated through collected trajectory samples while continuing to receive live position updates
-- **Orbit scale:** proportional to the Earth sphere radius and the documented 408 km ISS altitude, because Open Notify does not provide altitude
-- **Unavailable telemetry:** velocity and visibility are removed because Open Notify does not provide them
+- **Orbit scale:** proportional to the Earth sphere radius and API-provided ISS altitude in kilometers
+- **Camera behavior:** manual orbit resumes ISS follow after 30 seconds of inactivity
 
 Screenshot
 ![Three.js ISS Tracker](./isstracker.jpg)

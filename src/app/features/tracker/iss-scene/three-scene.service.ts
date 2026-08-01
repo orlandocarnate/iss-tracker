@@ -8,6 +8,7 @@ import { IssPosition } from '../../../core/models/iss-position.model';
 const EARTH_RADIUS_SCENE = 90;
 const EARTH_RADIUS_KM = 6_371;
 const INITIAL_CAMERA_RADIUS = 160;
+const FOLLOW_RESUME_DELAY_MS = 30_000;
 
 @Injectable()
 export class ThreeSceneService {
@@ -38,6 +39,7 @@ export class ThreeSceneService {
   private initialCameraPositioned = false;
   private followingIss = false;
   private cameraFollowDistance = this.followCameraDistance;
+  private followResumeTimer?: ReturnType<typeof setTimeout>;
 
   async initialize(host: HTMLElement): Promise<void> {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -93,6 +95,9 @@ export class ThreeSceneService {
     this.renderer.domElement.removeEventListener('pointermove', this.stopFollowingOnOrbit);
     this.renderer.domElement.removeEventListener('pointerup', this.selectIss);
     this.renderer.domElement.removeEventListener('wheel', this.captureFollowZoom);
+    if (this.followResumeTimer) {
+      clearTimeout(this.followResumeTimer);
+    }
     this.trajectoryMaterial.dispose();
     this.liveConnectorMaterial.dispose();
     this.scene.traverse((object) => {
@@ -255,12 +260,14 @@ export class ThreeSceneService {
     if (this.raycaster.intersectObject(this.hitSphere).length > 0) {
       this.followingIss = true;
       this.cameraFollowDistance = this.followCameraDistance;
+      this.clearFollowResumeTimer();
     }
   };
 
   private readonly stopFollowingOnOrbit = (event: PointerEvent): void => {
     if (event.buttons !== 0 && this.pointerDown.distanceTo(new THREE.Vector2(event.clientX, event.clientY)) > 5) {
       this.followingIss = false;
+      this.scheduleFollowResume();
     }
   };
 
@@ -293,6 +300,21 @@ export class ThreeSceneService {
     positions.setXYZ(1, this.iss.position.x, this.iss.position.y, this.iss.position.z);
     positions.needsUpdate = true;
     this.liveConnector.geometry.computeBoundingSphere();
+  }
+
+  private scheduleFollowResume(): void {
+    this.clearFollowResumeTimer();
+    this.followResumeTimer = setTimeout(() => {
+      this.followingIss = true;
+      this.followResumeTimer = undefined;
+    }, FOLLOW_RESUME_DELAY_MS);
+  }
+
+  private clearFollowResumeTimer(): void {
+    if (this.followResumeTimer) {
+      clearTimeout(this.followResumeTimer);
+      this.followResumeTimer = undefined;
+    }
   }
 
   private positionInitialCamera(): void {
