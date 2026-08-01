@@ -1,49 +1,46 @@
-# ISS Tracker using Three.js
-An International Space Station Tracker. Visualized using Three.js framework which uses the Where the ISS At API to retrieve the current ISS location and place it in proper orbit over the Earth in real-time.
-ISS was modeled in 3DS Max and exported as a GLTF file.
+# ISS Tracker
 
-## Angular 22 Migration Plan
+An Angular 22 and Three.js visualization of the International Space Station in real time. The ISS model was created in 3DS Max and exported as GLTF.
 
-The application will be migrated from the current Webpack/imperative JavaScript implementation to an Angular 22 standalone application. The existing Three.js visualization and static model assets will be retained while responsibilities are split into focused components and services.
+![ISS Tracker](./public/images/isstracker.jpg)
 
-1. Create the Angular 22 standalone application shell, configure the existing model, texture, image, and shader assets, and replace the Webpack build pipeline.
-2. Add typed ISS domain models and an `IssApiService` as the only owner of Where the ISS At API calls.
-3. Poll Where the ISS At every five seconds and retain the received samples in an in-memory trajectory buffer. This buffer will drive smooth ISS movement and the rendered orbital path.
-4. Convert the page shell into standalone Angular components for the application, ISS statistics, sidebar, and footer. Angular bindings will replace direct DOM mutation and inline event handlers.
-5. Create an `IssSceneComponent`, loaded from the main application template, to own the Three.js canvas lifecycle. A supporting scene service will encapsulate renderer setup, GLTF loading, animation, and GPU-resource disposal.
-6. Load the GLTF model once, position it from the live trajectory stream, and calculate orbital radius from the Earth sphere radius and the documented 408 km ISS altitude: `earthRadiusScene * (1 + altitudeKm / 6371)`.
-7. Align the equirectangular Earth texture in its shader rather than rotating the Earth mesh or offsetting ISS coordinates.
-8. Restore the initial historical trajectory using the Where the ISS At positions endpoint, while keeping Open Notify as the live source.
-9. Add a selectable hit sphere around the model: selecting it follows the ISS, and manual camera orbit disables following.
-10. Add focused tests for API mapping, trajectory buffering, coordinate projection, and component behavior before updating the deployment pipeline.
+## Features
 
-### Agreed data behavior
+- Angular 22 standalone components and services
+- Live ISS position polling every five seconds via [Where the ISS At](https://wheretheiss.at/w/developer)
+- A 95-minute historical trajectory, sampled every five minutes
+- Altitude-aware orbital positioning
+- Rainbow trajectory colors from oldest red samples to newest violet samples
+- Clickable ISS model that enables Earth-centered camera follow
+- Automatic follow resume after 30 seconds without manual camera orbit
+- Responsive Three.js canvas and custom Earth atmosphere shaders
 
-- **Live source:** [Where the ISS At](https://wheretheiss.at/w/developer)
-- **Polling cadence:** every five seconds
-- **Trajectory:** collected in the browser from live API samples
-- **Historical trajectory:** fetched once from Where the ISS At for the 95 minutes ending at the first live API timestamp
-- **Model motion:** animated through collected trajectory samples while continuing to receive live position updates
-- **Orbit scale:** proportional to the Earth sphere radius and API-provided ISS altitude in kilometers
-- **Camera behavior:** manual orbit resumes ISS follow after 30 seconds of inactivity
+## Architecture
 
-Screenshot
-![Three.js ISS Tracker](./isstracker.jpg)
+| Area | Location |
+| --- | --- |
+| API access | `src/app/core/services/iss-api.service.ts` |
+| Polling and trajectory state | `src/app/features/tracker/tracker.facade.ts` |
+| Three.js rendering and camera behavior | `src/app/features/tracker/iss-scene/three-scene.service.ts` |
+| Scene canvas component | `src/app/features/tracker/iss-scene/iss-scene.component.ts` |
 
-## ISS Tracker API
+See [Developer Notes](./DEVELOPERS_NOTES.md) for an ELI5 summary, migration details, coordinate alignment, camera behavior, and development decisions.
 
-http://open-notify.org/Open-Notify-API/ISS-Location-Now/
+## Development
 
-## Converting Latitude and Longitude to Cartesian Coordinates
+Angular 22 requires Node.js 22.22.3 or later.
 
-https://stackoverflow.com/questions/1185408/converting-from-longitude-latitude-to-cartesian-coordinates
+```bash
+npm install
+npm start
+```
 
-## Main NPM Packages
-* Three.js
+Create a production build:
 
-## Installation
-* With node.js and npm installed, you can clone my repository then in the root folder run the command `npm install`
-* run with the command `npm run dev`
+```bash
+npm run build
+```
 
-## Custom Shaders
-The Earth's atmospheric glow was made as a custom shader. I learned how to do it from [Chris Courses Youtube tutorial](https://youtu.be/vM8M4QloVL0)
+## Custom shaders
+
+The Earth atmosphere glow uses custom GLSL shaders. The original implementation was inspired by the [Chris Courses tutorial](https://youtu.be/vM8M4QloVL0).
