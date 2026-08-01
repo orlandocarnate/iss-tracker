@@ -22,7 +22,7 @@ The application will be migrated from the current Webpack/imperative JavaScript 
 - **Live source:** [Where the ISS At](https://wheretheiss.at/w/developer)
 - **Polling cadence:** every five seconds
 - **Trajectory:** collected in the browser from live API samples
-- **Historical trajectory:** fetched once from Where the ISS At for the six hours ending at the first live API timestamp
+- **Historical trajectory:** fetched once from Where the ISS At for the 95 minutes ending at the first live API timestamp
 - **Model motion:** animated through collected trajectory samples while continuing to receive live position updates
 - **Orbit scale:** proportional to the Earth sphere radius and API-provided ISS altitude in kilometers
 - **Camera behavior:** manual orbit resumes ISS follow after 30 seconds of inactivity

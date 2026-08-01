@@ -9,7 +9,7 @@ import {
 
 const ISS_LOCATION_URL = 'https://api.wheretheiss.at/v1/satellites/25544';
 const ISS_TRAJECTORY_URL = `${ISS_LOCATION_URL}/positions`;
-const TRAJECTORY_DURATION_SECONDS = 6 * 60 * 60;
+const TRAJECTORY_DURATION_SECONDS = 95 * 60;
 const TRAJECTORY_SAMPLE_INTERVAL_SECONDS = 300;
 const TRAJECTORY_BATCH_SIZE = 10;
 
