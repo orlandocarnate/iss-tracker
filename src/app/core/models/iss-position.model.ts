@@ -5,11 +5,9 @@ export interface IssPosition {
   timestamp: number;
 }
 
-export interface OpenNotifyIssResponse {
-  message: string;
+export interface WhereTheIssPosition {
+  altitude: number;
+  latitude: number;
+  longitude: number;
   timestamp: number;
-  iss_position: {
-    latitude: string;
-    longitude: string;
-  };
 }

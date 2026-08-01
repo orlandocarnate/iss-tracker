@@ -8,8 +8,9 @@ import { ThreeSceneService } from './three-scene.service';
   template: `<div #canvas class="scene-canvas" aria-label="Three-dimensional ISS tracker"></div>`,
   styles: [`
     .scene-canvas {
-      height: 100vh;
-      width: 100vw;
+      inset: 0;
+      overflow: hidden;
+      position: fixed;
     }
   `],
   providers: [ThreeSceneService]

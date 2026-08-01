@@ -17,6 +17,7 @@ export class TrackerFacade {
   readonly trajectory = signal<readonly IssPosition[]>([]);
   readonly error = signal<string | null>(null);
   readonly loading = signal(true);
+  private historicalTrajectoryRequested = false;
 
   constructor() {
     timer(0, POLL_INTERVAL_MS)
@@ -37,6 +38,23 @@ export class TrackerFacade {
       .subscribe((position) => this.updatePosition(position));
   }
 
+  private loadHistoricalTrajectory(endTimestamp: number): void {
+    this.api
+      .getHistoricalTrajectory(endTimestamp)
+      .pipe(
+        catchError((error: unknown) => {
+          this.error.set(
+            error instanceof Error ? error.message : 'Unable to retrieve the ISS trajectory.'
+          );
+          return EMPTY;
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe((positions) => {
+        this.trajectory.update((samples) => this.mergeTrajectory(positions, samples));
+      });
+  }
+
   private updatePosition(position: IssPosition): void {
     this.currentPosition.set(position);
     this.error.set(null);
@@ -46,7 +64,24 @@ export class TrackerFacade {
         return samples;
       }
 
-      return [...samples, position].slice(-MAX_TRAJECTORY_SAMPLES);
+      return this.mergeTrajectory(samples, [position]);
     });
+
+    if (!this.historicalTrajectoryRequested) {
+      this.historicalTrajectoryRequested = true;
+      this.loadHistoricalTrajectory(position.timestamp);
+    }
+  }
+
+  private mergeTrajectory(
+    first: readonly IssPosition[],
+    second: readonly IssPosition[]
+  ): readonly IssPosition[] {
+    const samplesByTimestamp = new Map<number, IssPosition>();
+    [...first, ...second].forEach((sample) => samplesByTimestamp.set(sample.timestamp, sample));
+
+    return [...samplesByTimestamp.values()]
+      .sort((left, right) => left.timestamp - right.timestamp)
+      .slice(-MAX_TRAJECTORY_SAMPLES);
   }
 }
